@@ -1,0 +1,738 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>DRE · Planeta Churros</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    :root {
+      --primary: #a76939; --primary-dark: #8a5630; --primary-light: #fdf6f0;
+      --bg: #f5f0eb; --card: #fff; --text: #2d1a0e; --muted: #9a7f6a;
+      --border: #ede5db; --green: #16a34a; --green-bg: #dcfce7;
+      --red: #dc2626; --red-bg: #fee2e2; --orange: #ea580c;
+    }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; padding-bottom: 72px; font-size: 14px; }
+
+    .header { background: var(--primary); color: #fff; padding: 14px 20px 12px; position: sticky; top: 0; z-index: 200; box-shadow: 0 2px 8px rgba(0,0,0,.15); }
+    .header-row { display: flex; align-items: center; justify-content: space-between; }
+    .header h1 { font-size: 17px; font-weight: 700; }
+    .header-sub { font-size: 11px; opacity: .75; margin-top: 1px; }
+    .sync-btn { background: rgba(255,255,255,.2); border: none; color: #fff; border-radius: 8px; padding: 6px 10px; font-size: 12px; font-weight: 600; cursor: pointer; }
+    .sync-btn:active { background: rgba(255,255,255,.35); }
+
+    .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; background: #fff; display: flex; border-top: 1px solid var(--border); z-index: 200; padding-bottom: env(safe-area-inset-bottom); }
+    .nav-btn { flex: 1; border: none; background: none; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 10px 0; font-size: 10px; font-weight: 500; color: var(--muted); cursor: pointer; }
+    .nav-btn.active { color: var(--primary); }
+    .nav-btn svg { width: 22px; height: 22px; stroke-width: 1.8; }
+
+    .view { display: none; padding: 14px 16px; }
+    .view.active { display: block; }
+
+    .card { background: var(--card); border-radius: 14px; padding: 16px; margin-bottom: 12px; box-shadow: 0 1px 4px rgba(0,0,0,.07); }
+    .card-title { font-size: 13px; font-weight: 700; margin-bottom: 12px; }
+
+    .total-bar { background: var(--primary); color: #fff; border-radius: 14px; padding: 16px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: flex-start; }
+    .tb-label { font-size: 10px; opacity: .8; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 4px; }
+    .tb-value { font-size: 26px; font-weight: 800; letter-spacing: -1px; line-height: 1; }
+    .tb-sub { font-size: 11px; opacity: .75; margin-top: 4px; }
+
+    .month-nav { display: flex; align-items: center; justify-content: center; gap: 20px; padding: 8px 0 4px; }
+    .month-nav button { background: var(--card); border: 1.5px solid var(--border); border-radius: 8px; width: 36px; height: 36px; font-size: 18px; color: var(--primary); cursor: pointer; }
+    .month-nav span { font-size: 16px; font-weight: 700; min-width: 140px; text-align: center; }
+
+    .metric-row { display: flex; align-items: flex-start; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--border); }
+    .metric-row:last-child { border-bottom: none; padding-bottom: 0; }
+    .metric-row:first-child { padding-top: 0; }
+    .metric-name { font-size: 13px; display: flex; align-items: center; gap: 6px; font-weight: 600; }
+    .metric-detail { font-size: 11px; color: var(--muted); margin-top: 3px; }
+    .metric-right { text-align: right; flex-shrink: 0; margin-left: 8px; }
+    .metric-val { font-size: 14px; font-weight: 700; }
+    .metric-meta { font-size: 11px; color: var(--muted); margin-top: 2px; }
+    .dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; margin-top: 2px; }
+
+    .badge { display: inline-block; font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 20px; }
+    .badge-red { background: var(--red-bg); color: var(--red); }
+    .badge-green { background: var(--green-bg); color: var(--green); }
+    .badge-gray { background: #f0ebe3; color: var(--muted); }
+    .badge-orange { background: #fff3e0; color: var(--orange); }
+
+    .chart-wrap { height: 180px; margin: 12px 0 4px; }
+
+    .semana-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .semana-card { padding: 12px; border-radius: 12px; border: 2px solid var(--border); background: var(--card); cursor: pointer; text-align: center; }
+    .semana-card.active { border-color: var(--primary); background: var(--primary-light); }
+    .semana-card.filled { border-color: #86efac; background: #f0fdf4; }
+    .semana-card .s-num { font-size: 18px; font-weight: 800; }
+    .semana-card .s-dates { font-size: 10px; color: var(--muted); }
+    .semana-card .s-status { font-size: 11px; margin-top: 5px; font-weight: 600; }
+
+    .fblock-title { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: var(--primary); padding: 12px 0 8px; border-bottom: 2px solid var(--primary-light); margin-bottom: 12px; display: flex; align-items: center; gap: 6px; }
+    .fhint { font-size: 11px; color: var(--muted); margin-bottom: 10px; line-height: 1.5; }
+    .fgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .fgroup { display: flex; flex-direction: column; gap: 3px; }
+    .flabel { font-size: 10px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .3px; }
+    .finput { padding: 10px; border: 1.5px solid var(--border); border-radius: 8px; font-size: 15px; background: #fff; width: 100%; color: var(--text); }
+    .finput:focus { outline: none; border-color: var(--primary); }
+
+    .calc-box { background: var(--primary-light); border-radius: 10px; padding: 10px 12px; margin-top: 8px; display: none; }
+    .cline { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); padding: 2px 0; }
+    .cline.total { font-size: 13px; font-weight: 700; color: var(--text); border-top: 1px solid var(--border); margin-top: 5px; padding-top: 7px; }
+    .cline.warn { color: var(--red); }
+    .divider { height: 1px; background: var(--border); margin: 14px 0; }
+
+    .btn-primary { width: 100%; padding: 15px; background: var(--primary); color: #fff; border: none; border-radius: 12px; font-size: 15px; font-weight: 700; cursor: pointer; margin-top: 8px; }
+    .btn-primary:active { background: var(--primary-dark); }
+    .btn-outline { flex: 1; padding: 11px; background: #fff; border: 1.5px solid var(--border); border-radius: 10px; font-size: 13px; font-weight: 600; cursor: pointer; }
+
+    .section-tag { display: inline-flex; align-items: center; gap: 4px; font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 6px; text-transform: uppercase; letter-spacing: .3px; margin-bottom: 10px; }
+    .tag-direto { background: var(--green-bg); color: var(--green); }
+    .tag-stone { background: #fff3e0; color: var(--orange); }
+
+    .empty { text-align: center; padding: 24px 16px; color: var(--muted); font-size: 13px; }
+
+    /* LOADING OVERLAY */
+    .loading-overlay { position: fixed; inset: 0; background: rgba(167,105,57,.92); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 500; color: #fff; gap: 16px; }
+    .loading-overlay.hidden { display: none; }
+    .spinner { width: 40px; height: 40px; border: 3px solid rgba(255,255,255,.3); border-top-color: #fff; border-radius: 50%; animation: spin .8s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loading-text { font-size: 14px; font-weight: 600; opacity: .9; }
+
+    /* SETUP CARD */
+    .setup-card { background: #fff3e0; border: 2px solid var(--orange); border-radius: 14px; padding: 16px; margin-bottom: 12px; }
+    .setup-card h3 { font-size: 14px; font-weight: 700; color: var(--orange); margin-bottom: 8px; }
+    .setup-card p { font-size: 12px; color: var(--text); line-height: 1.6; margin-bottom: 4px; }
+    .setup-steps { font-size: 12px; color: var(--text); line-height: 2; padding-left: 4px; }
+    .setup-steps b { color: var(--primary); }
+
+    /* STATUS SYNC */
+    .sync-status { font-size: 11px; text-align: center; padding: 6px; border-radius: 8px; margin-bottom: 8px; }
+    .sync-ok { background: var(--green-bg); color: var(--green); }
+    .sync-err { background: var(--red-bg); color: var(--red); }
+    .sync-warn { background: #fff3e0; color: var(--orange); }
+
+    /* TOAST */
+    .toast { position: fixed; bottom: 82px; left: 50%; transform: translateX(-50%) translateY(20px); background: #1e1e1e; color: #fff; padding: 10px 20px; border-radius: 20px; font-size: 13px; font-weight: 500; z-index: 300; opacity: 0; transition: all .25s; white-space: nowrap; pointer-events: none; }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  </style>
+</head>
+<body>
+
+<!-- LOADING -->
+<div class="loading-overlay hidden" id="loading">
+  <div class="spinner"></div>
+  <div class="loading-text" id="loading-text">Sincronizando...</div>
+</div>
+
+<div class="header">
+  <div class="header-row">
+    <div>
+      <h1>🍩 Planeta Churros — DRE</h1>
+      <div class="header-sub" id="header-sub">carregando...</div>
+    </div>
+    <button class="sync-btn" onclick="syncNow()">↻ Sync</button>
+  </div>
+</div>
+
+<!-- ══ DASHBOARD ══ -->
+<div class="view active" id="view-dashboard">
+  <div class="month-nav">
+    <button onclick="changeMonth(-1)">‹</button>
+    <span id="month-label"></span>
+    <button onclick="changeMonth(1)">›</button>
+  </div>
+
+  <div id="sync-bar"></div>
+
+  <div class="total-bar">
+    <div>
+      <div class="tb-label">Receita Líquida</div>
+      <div class="tb-value" id="d-liq">R$ —</div>
+      <div class="tb-sub" id="d-taxa-sub"></div>
+    </div>
+    <div style="text-align:right">
+      <div class="tb-label">Bruto total</div>
+      <div style="font-size:20px;font-weight:800;margin-top:4px;" id="d-bruto">R$ —</div>
+      <div class="tb-sub" id="d-semanas"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Por Canal</div>
+    <div id="canal-rows"><div class="empty">Nenhum lançamento ainda. Vá em Lançar.</div></div>
+    <div class="chart-wrap"><canvas id="chart-canais"></canvas></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Semana a Semana</div>
+    <div id="semanas-rows"><div class="empty">Sem dados</div></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">📊 Fechamento do Mês</div>
+    <div id="fechamento-rows"><div class="empty">Preencha as semanas para ver o fechamento</div></div>
+  </div>
+</div>
+
+<!-- ══ LANÇAR ══ -->
+<div class="view" id="view-lancar">
+  <div class="card">
+    <div class="card-title">Selecione a semana</div>
+    <div class="semana-grid" id="semana-grid"></div>
+  </div>
+
+  <div id="form-wrap" style="display:none">
+    <div class="card">
+      <div style="font-size:15px;font-weight:800;margin-bottom:18px;" id="form-title"></div>
+
+      <!-- CW SALÃO -->
+      <div class="fblock-title">🪑 CW Salão (Mesa/Comanda)</div>
+      <div class="section-tag tag-stone">Stone: crédito e débito têm taxa</div>
+      <div class="fhint">Análise de Vendas → Tipo = Mesa/Comanda → Forma de Pagamento</div>
+      <div class="fgrid" style="margin-bottom:8px;">
+        <div class="fgroup"><span class="flabel">Crédito (Stone)</span><input type="number" class="finput" id="s-cred" placeholder="0.00" inputmode="decimal" oninput="calcSalao()"></div>
+        <div class="fgroup"><span class="flabel">Débito (Stone)</span><input type="number" class="finput" id="s-deb" placeholder="0.00" inputmode="decimal" oninput="calcSalao()"></div>
+        <div class="fgroup"><span class="flabel">Pix (direto)</span><input type="number" class="finput" id="s-pix" placeholder="0.00" inputmode="decimal" oninput="calcSalao()"></div>
+        <div class="fgroup"><span class="flabel">Dinheiro (direto)</span><input type="number" class="finput" id="s-din" placeholder="0.00" inputmode="decimal" oninput="calcSalao()"></div>
+      </div>
+      <div class="fgrid"><div class="fgroup"><span class="flabel">Qtd pedidos</span><input type="number" class="finput" id="s-qtd" placeholder="0" inputmode="numeric" oninput="calcSalao()"></div></div>
+      <div class="calc-box" id="calc-salao">
+        <div class="cline"><span>Faturamento bruto</span><span id="cs-bruto">—</span></div>
+        <div class="cline warn"><span id="cs-cred-lbl">− Taxa crédito</span><span id="cs-cred-taxa">—</span></div>
+        <div class="cline warn"><span id="cs-deb-lbl">− Taxa débito</span><span id="cs-deb-taxa">—</span></div>
+        <div class="cline total"><span>Você recebe (salão)</span><span id="cs-liq">—</span></div>
+        <div class="cline" style="margin-top:4px;"><span>Ticket médio</span><span id="cs-ticket">—</span></div>
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- CW DELIVERY -->
+      <div class="fblock-title">🛵 CW Delivery (em casa)</div>
+      <div class="section-tag tag-direto">100% direto — sem taxa</div>
+      <div class="fhint">Análise de Vendas → Tipo = Delivery</div>
+      <div class="fgrid">
+        <div class="fgroup"><span class="flabel">Total recebido</span><input type="number" class="finput" id="d-total" placeholder="0.00" inputmode="decimal" oninput="calcDelivery()"></div>
+        <div class="fgroup"><span class="flabel">Qtd pedidos</span><input type="number" class="finput" id="d-qtd" placeholder="0" inputmode="numeric" oninput="calcDelivery()"></div>
+      </div>
+      <div class="calc-box" id="calc-del">
+        <div class="cline total"><span>Ticket médio delivery</span><span id="cd-ticket">—</span></div>
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- CW BALCÃO -->
+      <div class="fblock-title">🏪 CW Balcão (Retirada)</div>
+      <div class="section-tag tag-direto">100% direto — sem taxa</div>
+      <div class="fhint">Análise de Vendas → Tipo = Retirada</div>
+      <div class="fgrid">
+        <div class="fgroup"><span class="flabel">Total recebido</span><input type="number" class="finput" id="b-total" placeholder="0.00" inputmode="decimal" oninput="calcBalcao()"></div>
+        <div class="fgroup"><span class="flabel">Qtd pedidos</span><input type="number" class="finput" id="b-qtd" placeholder="0" inputmode="numeric" oninput="calcBalcao()"></div>
+      </div>
+      <div class="calc-box" id="calc-bal">
+        <div class="cline total"><span>Ticket médio balcão</span><span id="cb-ticket">—</span></div>
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- iFOOD -->
+      <div class="fblock-title">🟩 iFood</div>
+      <div class="fgrid">
+        <div class="fgroup"><span class="flabel">Faturamento bruto</span><input type="number" class="finput" id="if-bruto" placeholder="0.00" inputmode="decimal" oninput="calcIF()"></div>
+        <div class="fgroup"><span class="flabel">Repasse recebido</span><input type="number" class="finput" id="if-rep" placeholder="0.00" inputmode="decimal" oninput="calcIF()"></div>
+        <div class="fgroup"><span class="flabel">Qtd pedidos</span><input type="number" class="finput" id="if-qtd" placeholder="0" inputmode="numeric" oninput="calcIF()"></div>
+      </div>
+      <div class="calc-box" id="calc-if">
+        <div class="cline warn"><span>Taxa iFood (R$)</span><span id="ci-taxa">—</span></div>
+        <div class="cline warn"><span>% retido pelo iFood</span><span id="ci-pct">—</span></div>
+        <div class="cline total"><span>Ticket médio (bruto)</span><span id="ci-ticket">—</span></div>
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- 99FOOD -->
+      <div class="fblock-title">🟣 99food</div>
+      <div class="fgrid">
+        <div class="fgroup"><span class="flabel">Faturamento bruto</span><input type="number" class="finput" id="f9-bruto" placeholder="0.00" inputmode="decimal" oninput="calc99()"></div>
+        <div class="fgroup"><span class="flabel">Repasse recebido</span><input type="number" class="finput" id="f9-rep" placeholder="0.00" inputmode="decimal" oninput="calc99()"></div>
+        <div class="fgroup"><span class="flabel">Qtd pedidos</span><input type="number" class="finput" id="f9-qtd" placeholder="0" inputmode="numeric" oninput="calc99()"></div>
+      </div>
+      <div class="calc-box" id="calc-99">
+        <div class="cline warn"><span>Taxa 99food (R$)</span><span id="c9-taxa">—</span></div>
+        <div class="cline warn"><span>% retido pela 99food</span><span id="c9-pct">—</span></div>
+        <div class="cline total"><span>Ticket médio (bruto)</span><span id="c9-ticket">—</span></div>
+      </div>
+
+      <button class="btn-primary" id="btn-salvar" onclick="salvarSemana()">✓ Salvar Semana</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ CONFIG ══ -->
+<div class="view" id="view-config">
+
+  <!-- SETUP NUVEM -->
+  <div id="setup-card-wrap"></div>
+
+  <div class="card">
+    <div class="card-title">🔗 URL do Google Apps Script</div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:10px;line-height:1.6;">
+      Cole aqui a URL gerada após o deploy do Apps Script.<br>
+      Siga o passo a passo abaixo se ainda não configurou.
+    </div>
+    <div class="fgroup" style="margin-bottom:10px;">
+      <span class="flabel">URL do Web App</span>
+      <input type="url" class="finput" id="cfg-url" placeholder="https://script.google.com/macros/s/..." style="font-size:12px;">
+    </div>
+    <button class="btn-primary" onclick="salvarURL()">Salvar URL</button>
+  </div>
+
+  <div class="card">
+    <div class="card-title">⚙️ Taxas Stone (maquineta salão)</div>
+    <div class="fgroup" style="margin-bottom:12px;">
+      <span class="flabel">Taxa Crédito (%)</span>
+      <input type="number" class="finput" id="cfg-cred" step="0.01" placeholder="3.49" inputmode="decimal">
+    </div>
+    <div class="fgroup" style="margin-bottom:14px;">
+      <span class="flabel">Taxa Débito (%)</span>
+      <input type="number" class="finput" id="cfg-deb" step="0.01" placeholder="1.99" inputmode="decimal">
+    </div>
+    <button class="btn-primary" onclick="salvarConfig()">Salvar Taxas</button>
+  </div>
+
+  <!-- PASSO A PASSO -->
+  <div class="card" style="background:var(--primary-light);">
+    <div class="card-title">📋 Como configurar a nuvem (fazer 1 vez)</div>
+    <div class="setup-steps">
+      <b>1.</b> Abra <b>sheets.google.com</b> e crie uma planilha nova<br>
+      <b>2.</b> No menu: <b>Extensões → Apps Script</b><br>
+      <b>3.</b> Apague o código que aparece e cole o conteúdo do arquivo <b>apps-script.gs</b><br>
+      <b>4.</b> Clique em <b>Salvar</b> (ícone de disquete)<br>
+      <b>5.</b> Clique em <b>Implantar → Nova implantação</b><br>
+      <b>6.</b> Tipo: <b>App da Web</b><br>
+      <b>7.</b> "Executar como": <b>Eu</b><br>
+      <b>8.</b> "Quem tem acesso": <b>Qualquer pessoa</b><br>
+      <b>9.</b> Clique <b>Implantar</b> → autorize → copie a URL<br>
+      <b>10.</b> Cole a URL aqui em cima e salve ✓
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Dados locais</div>
+    <div style="display:flex;gap:8px;">
+      <button class="btn-outline" onclick="exportarDados()">⬇ Exportar JSON</button>
+      <button class="btn-outline" style="border-color:var(--red);color:var(--red);" onclick="limparLocal()">✕ Limpar cache</button>
+    </div>
+  </div>
+</div>
+
+<!-- BOTTOM NAV -->
+<div class="bottom-nav">
+  <button class="nav-btn active" id="nav-dashboard" onclick="nav('dashboard')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+    Dashboard
+  </button>
+  <button class="nav-btn" id="nav-lancar" onclick="nav('lancar')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="9"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+    Lançar
+  </button>
+  <button class="nav-btn" id="nav-config" onclick="nav('config')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+    Config
+  </button>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ══════════════════════════════════════════
+//  CONSTANTES
+// ══════════════════════════════════════════
+const MONTHS = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+const SEMANAS_DEF = [
+  {num:1,label:'01–07',q:1},{num:2,label:'08–15',q:1},
+  {num:3,label:'16–22',q:2},{num:4,label:'23–31',q:2},
+];
+
+// ══════════════════════════════════════════
+//  STATE
+// ══════════════════════════════════════════
+let curMonth  = new Date().getMonth();
+let curYear   = new Date().getFullYear();
+let curSemana = null;
+let chartObj  = null;
+let localData = {}; // cache: { "2026-4": { semanas: {} } }
+let lastSync  = null;
+
+// ══════════════════════════════════════════
+//  STORAGE LOCAL (cache)
+// ══════════════════════════════════════════
+const cKey = (y,m) => `pc_dre3_${y}_${m}`;
+function cacheGet(y,m){ try{ return JSON.parse(localStorage.getItem(cKey(y,m)))||{semanas:{}}; }catch{ return {semanas:{}}; } }
+function cacheSet(y,m,d){ localStorage.setItem(cKey(y,m), JSON.stringify(d)); }
+function getCfg(){ try{ return JSON.parse(localStorage.getItem('pc_dre3_cfg'))||{cred:3.49,deb:1.99}; }catch{ return {cred:3.49,deb:1.99}; } }
+function setCfgLocal(c){ localStorage.setItem('pc_dre3_cfg', JSON.stringify(c)); }
+const FIXED_URL = 'https://script.google.com/macros/s/AKfycbyFV1KczCTAaj1ppDtwM4KS_Md2tt_d6ff-DzzqqapFVbgjkb88BNkcKjIzTEYn_xTO/exec';
+function getURL(){ return FIXED_URL; }
+function setURL(u){ /* URL fixa */ }
+
+// ══════════════════════════════════════════
+//  API (Google Apps Script)
+// ══════════════════════════════════════════
+async function apiGet(year, month){
+  const url = getURL();
+  if(!url) return null;
+  const res = await fetch(`${url}?year=${year}&month=${month}`, {redirect:'follow'});
+  const json = await res.json();
+  return json.ok ? json.data : null;
+}
+
+async function apiPost(body){
+  const url = getURL();
+  if(!url) return false;
+  const res = await fetch(url, {
+    method:'POST',
+    body: JSON.stringify(body),
+    headers:{'Content-Type':'application/json'},
+    redirect:'follow'
+  });
+  const json = await res.json();
+  return json.ok;
+}
+
+// ══════════════════════════════════════════
+//  SYNC
+// ══════════════════════════════════════════
+function showLoading(msg='Sincronizando...'){
+  document.getElementById('loading-text').textContent = msg;
+  document.getElementById('loading').classList.remove('hidden');
+}
+function hideLoading(){ document.getElementById('loading').classList.add('hidden'); }
+
+async function syncNow(silent=false){
+  if(!getURL()){
+    setSyncBar('warn','Nuvem não configurada — usando dados locais');
+    return;
+  }
+  if(!silent) showLoading('Sincronizando com a nuvem...');
+  try {
+    const data = await apiGet(curYear, curMonth);
+    if(data){
+      cacheSet(curYear, curMonth, {semanas: data.semanas||{}});
+      if(data.config){
+        setCfgLocal({...getCfg(), ...data.config});
+      }
+      lastSync = new Date();
+      setSyncBar('ok', `Sincronizado às ${lastSync.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}`);
+    }
+  } catch(e){
+    setSyncBar('err','Sem conexão — exibindo dados em cache');
+  }
+  hideLoading();
+  renderDash();
+}
+
+function setSyncBar(type, msg){
+  const bar = document.getElementById('sync-bar');
+  const cls = type==='ok'?'sync-ok':type==='err'?'sync-err':'sync-warn';
+  bar.innerHTML = `<div class="sync-status ${cls}">${msg}</div>`;
+}
+
+// ══════════════════════════════════════════
+//  HELPERS
+// ══════════════════════════════════════════
+const Rz = v => 'R$ '+Number(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+const R  = v => (v==null||isNaN(v)||v===0)?'—':Rz(v);
+const P  = v => (v==null||isNaN(v))?'—':Number(v).toFixed(1)+'%';
+const N  = id => parseFloat(document.getElementById(id)?.value)||0;
+const ticket = (val,qtd) => qtd>0?R(val/qtd):'—';
+function toast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2500); }
+
+// ══════════════════════════════════════════
+//  NAVEGAÇÃO
+// ══════════════════════════════════════════
+function nav(v){
+  document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(x=>x.classList.remove('active'));
+  document.getElementById('view-'+v).classList.add('active');
+  document.getElementById('nav-'+v).classList.add('active');
+  if(v==='dashboard') renderDash();
+  if(v==='lancar')    renderLancar();
+  if(v==='config')    renderConfig();
+}
+function changeMonth(d){ curMonth+=d; if(curMonth>11){curMonth=0;curYear++;} if(curMonth<0){curMonth=11;curYear--;} syncNow(); }
+
+// ══════════════════════════════════════════
+//  CALCS TEMPO REAL
+// ══════════════════════════════════════════
+function calcSalao(){
+  const cfg=getCfg(), cred=N('s-cred'),deb=N('s-deb'),pix=N('s-pix'),din=N('s-din'),qtd=N('s-qtd');
+  const bruto=cred+deb+pix+din; const box=document.getElementById('calc-salao');
+  if(bruto===0&&qtd===0){box.style.display='none';return;}
+  const tCred=cred*cfg.cred/100, tDeb=deb*cfg.deb/100, liq=bruto-tCred-tDeb;
+  box.style.display='block';
+  document.getElementById('cs-bruto').textContent=Rz(bruto);
+  document.getElementById('cs-cred-lbl').textContent=`− Taxa crédito (${cfg.cred}%)`;
+  document.getElementById('cs-cred-taxa').textContent=cred>0?'−'+Rz(tCred):'—';
+  document.getElementById('cs-deb-lbl').textContent=`− Taxa débito (${cfg.deb}%)`;
+  document.getElementById('cs-deb-taxa').textContent=deb>0?'−'+Rz(tDeb):'—';
+  document.getElementById('cs-liq').textContent=Rz(liq);
+  document.getElementById('cs-ticket').textContent=ticket(bruto,qtd);
+}
+function calcDelivery(){
+  const total=N('d-total'),qtd=N('d-qtd'); const box=document.getElementById('calc-del');
+  if(total===0&&qtd===0){box.style.display='none';return;}
+  box.style.display='block'; document.getElementById('cd-ticket').textContent=ticket(total,qtd);
+}
+function calcBalcao(){
+  const total=N('b-total'),qtd=N('b-qtd'); const box=document.getElementById('calc-bal');
+  if(total===0&&qtd===0){box.style.display='none';return;}
+  box.style.display='block'; document.getElementById('cb-ticket').textContent=ticket(total,qtd);
+}
+function calcIF(){
+  const bruto=N('if-bruto'),rep=N('if-rep'),qtd=N('if-qtd'); const box=document.getElementById('calc-if');
+  if(bruto===0){box.style.display='none';return;}
+  const taxa=bruto-rep,pct=taxa/bruto*100; box.style.display='block';
+  document.getElementById('ci-taxa').textContent='−'+Rz(taxa);
+  document.getElementById('ci-pct').textContent=P(pct);
+  document.getElementById('ci-ticket').textContent=ticket(bruto,qtd);
+}
+function calc99(){
+  const bruto=N('f9-bruto'),rep=N('f9-rep'),qtd=N('f9-qtd'); const box=document.getElementById('calc-99');
+  if(bruto===0){box.style.display='none';return;}
+  const taxa=bruto-rep,pct=taxa/bruto*100; box.style.display='block';
+  document.getElementById('c9-taxa').textContent='−'+Rz(taxa);
+  document.getElementById('c9-pct').textContent=P(pct);
+  document.getElementById('c9-ticket').textContent=ticket(bruto,qtd);
+}
+
+// ══════════════════════════════════════════
+//  SALVAR SEMANA
+// ══════════════════════════════════════════
+async function salvarSemana(){
+  if(!curSemana) return;
+  const btn = document.getElementById('btn-salvar');
+  btn.textContent='Salvando...'; btn.disabled=true;
+  const cfg=getCfg();
+  const cred=N('s-cred'),deb=N('s-deb'),pix=N('s-pix'),din=N('s-din'),sQtd=N('s-qtd');
+  const sBruto=cred+deb+pix+din, sTaxa=(cred*cfg.cred/100)+(deb*cfg.deb/100);
+  const ifBruto=N('if-bruto'),ifRep=N('if-rep');
+  const f9Bruto=N('f9-bruto'),f9Rep=N('f9-rep');
+  const dados = {
+    salao:{ cred,deb,pix,din, bruto:sBruto, taxa:sTaxa, liq:sBruto-sTaxa, qtd:sQtd },
+    delivery:{ total:N('d-total'), qtd:N('d-qtd') },
+    balcao:{ total:N('b-total'), qtd:N('b-qtd') },
+    ifood:{ bruto:ifBruto, repasse:ifRep, taxa:ifBruto-ifRep, qtd:N('if-qtd') },
+    food99:{ bruto:f9Bruto, repasse:f9Rep, taxa:f9Bruto-f9Rep, qtd:N('f9-qtd') },
+  };
+  // salva no cache local imediatamente
+  const local = cacheGet(curYear,curMonth);
+  local.semanas[curSemana] = dados;
+  cacheSet(curYear,curMonth,local);
+  // envia para nuvem
+  try {
+    await apiPost({ year:curYear, month:curMonth, semana:curSemana, dados });
+    toast(`Semana ${curSemana} salva na nuvem ✓`);
+    setSyncBar('ok',`Salvo às ${new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}`);
+  } catch {
+    toast(`Salvo localmente (sem internet)`);
+    setSyncBar('warn','Sem conexão — dado salvo localmente, sincronize depois');
+  }
+  btn.textContent='✓ Salvar Semana'; btn.disabled=false;
+  renderLancar();
+}
+
+// ══════════════════════════════════════════
+//  RENDER LANÇAR
+// ══════════════════════════════════════════
+function renderLancar(){
+  const data = cacheGet(curYear,curMonth);
+  const grid = document.getElementById('semana-grid');
+  grid.innerHTML='';
+  SEMANAS_DEF.forEach(s=>{
+    const filled=!!data.semanas[s.num], active=curSemana===s.num;
+    const div=document.createElement('div');
+    div.className='semana-card'+(active?' active':'')+(filled&&!active?' filled':'');
+    div.innerHTML=`<div class="s-num">S${s.num}</div><div class="s-dates">dias ${s.label}</div><div class="s-status">${filled?'✅ Preenchida':'◯ Em branco'}</div>`;
+    div.onclick=()=>{ curSemana=s.num; renderLancar(); abrirForm(s.num); };
+    grid.appendChild(div);
+  });
+}
+function abrirForm(num){
+  document.getElementById('form-wrap').style.display='block';
+  document.getElementById('form-title').textContent=`Semana ${num} — dias ${SEMANAS_DEF[num-1].label}`;
+  ['s-cred','s-deb','s-pix','s-din','s-qtd','d-total','d-qtd','b-total','b-qtd','if-bruto','if-rep','if-qtd','f9-bruto','f9-rep','f9-qtd']
+    .forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
+  ['calc-salao','calc-del','calc-bal','calc-if','calc-99'].forEach(id=>document.getElementById(id).style.display='none');
+  const ex=cacheGet(curYear,curMonth).semanas[num];
+  if(ex){
+    const set=(id,v)=>{ const el=document.getElementById(id); if(el&&v!=null&&v!==0) el.value=v; };
+    set('s-cred',ex.salao?.cred); set('s-deb',ex.salao?.deb); set('s-pix',ex.salao?.pix); set('s-din',ex.salao?.din); set('s-qtd',ex.salao?.qtd);
+    set('d-total',ex.delivery?.total); set('d-qtd',ex.delivery?.qtd);
+    set('b-total',ex.balcao?.total); set('b-qtd',ex.balcao?.qtd);
+    set('if-bruto',ex.ifood?.bruto); set('if-rep',ex.ifood?.repasse); set('if-qtd',ex.ifood?.qtd);
+    set('f9-bruto',ex.food99?.bruto); set('f9-rep',ex.food99?.repasse); set('f9-qtd',ex.food99?.qtd);
+    calcSalao(); calcDelivery(); calcBalcao(); calcIF(); calc99();
+  }
+  setTimeout(()=>document.getElementById('form-wrap').scrollIntoView({behavior:'smooth',block:'start'}),100);
+}
+
+// ══════════════════════════════════════════
+//  AGGREGATE
+// ══════════════════════════════════════════
+function agg(semanas,nums){
+  const r={salao:{bruto:0,taxa:0,liq:0,qtd:0},delivery:{total:0,qtd:0},balcao:{total:0,qtd:0},ifood:{bruto:0,rep:0,taxa:0,qtd:0},food99:{bruto:0,rep:0,taxa:0,qtd:0}};
+  nums.forEach(n=>{
+    const s=semanas[n]; if(!s) return;
+    if(s.salao){ r.salao.bruto+=s.salao.bruto||0; r.salao.taxa+=s.salao.taxa||0; r.salao.liq+=s.salao.liq||0; r.salao.qtd+=s.salao.qtd||0; }
+    if(s.delivery){ r.delivery.total+=s.delivery.total||0; r.delivery.qtd+=s.delivery.qtd||0; }
+    if(s.balcao){ r.balcao.total+=s.balcao.total||0; r.balcao.qtd+=s.balcao.qtd||0; }
+    if(s.ifood){ r.ifood.bruto+=s.ifood.bruto||0; r.ifood.rep+=s.ifood.repasse||0; r.ifood.taxa+=s.ifood.taxa||0; r.ifood.qtd+=s.ifood.qtd||0; }
+    if(s.food99){ r.food99.bruto+=s.food99.bruto||0; r.food99.rep+=s.food99.repasse||0; r.food99.taxa+=s.food99.taxa||0; r.food99.qtd+=s.food99.qtd||0; }
+  });
+  r.totalBruto=r.salao.bruto+r.delivery.total+r.balcao.total+r.ifood.bruto+r.food99.bruto;
+  r.totalTaxa=r.salao.taxa+r.ifood.taxa+r.food99.taxa;
+  r.totalLiq=r.salao.liq+r.delivery.total+r.balcao.total+r.ifood.rep+r.food99.rep;
+  r.totalQtd=r.salao.qtd+r.delivery.qtd+r.balcao.qtd+r.ifood.qtd+r.food99.qtd;
+  return r;
+}
+
+// ══════════════════════════════════════════
+//  RENDER DASHBOARD
+// ══════════════════════════════════════════
+function renderDash(){
+  document.getElementById('month-label').textContent=`${MONTHS[curMonth]} ${curYear}`;
+  document.getElementById('header-sub').textContent=`DRE — ${MONTHS[curMonth]} ${curYear}`;
+  const data=cacheGet(curYear,curMonth);
+  const filled=Object.keys(data.semanas).length;
+  const all=agg(data.semanas,[1,2,3,4]);
+  document.getElementById('d-liq').textContent=all.totalLiq>0?Rz(all.totalLiq):'R$ —';
+  document.getElementById('d-bruto').textContent=all.totalBruto>0?Rz(all.totalBruto):'R$ —';
+  document.getElementById('d-semanas').textContent=`${filled}/4 semanas · ${all.totalQtd} pedidos`;
+  document.getElementById('d-taxa-sub').textContent=all.totalTaxa>0?`Taxas: ${Rz(all.totalTaxa)} (${P(all.totalTaxa/all.totalBruto*100)})`:'';
+
+  // canais
+  const canais=[
+    {label:'CW Salão',bruto:all.salao.bruto,liq:all.salao.liq,taxa:all.salao.taxa,qtd:all.salao.qtd,color:'#a76939',direto:false},
+    {label:'CW Delivery',bruto:all.delivery.total,liq:all.delivery.total,taxa:0,qtd:all.delivery.qtd,color:'#2563eb',direto:true},
+    {label:'CW Balcão',bruto:all.balcao.total,liq:all.balcao.total,taxa:0,qtd:all.balcao.qtd,color:'#0891b2',direto:true},
+    {label:'iFood',bruto:all.ifood.bruto,liq:all.ifood.rep,taxa:all.ifood.taxa,qtd:all.ifood.qtd,color:'#ea1d2c',direto:false},
+    {label:'99food',bruto:all.food99.bruto,liq:all.food99.rep,taxa:all.food99.taxa,qtd:all.food99.qtd,color:'#6c3cbd',direto:false},
+  ].filter(c=>c.bruto>0);
+
+  const cDiv=document.getElementById('canal-rows');
+  if(all.totalBruto===0){ cDiv.innerHTML='<div class="empty">Nenhum lançamento ainda. Vá em Lançar.</div>'; }
+  else {
+    cDiv.innerHTML=canais.map(c=>{
+      const share=all.totalBruto>0?c.bruto/all.totalBruto*100:0;
+      const taxaPct=c.bruto>0?c.taxa/c.bruto*100:0;
+      const tkm=c.qtd>0?R(c.bruto/c.qtd):'—';
+      const tag=c.direto?`<span class="badge badge-green">direto</span>`:`<span class="badge badge-red">${P(taxaPct)} taxa</span>`;
+      return `<div class="metric-row">
+        <div style="flex:1">
+          <div class="metric-name"><span class="dot" style="background:${c.color}"></span>${c.label} ${tag}</div>
+          <div class="metric-detail">Bruto: ${R(c.bruto)} · ${c.qtd} pedidos · Ticket: ${tkm}</div>
+        </div>
+        <div class="metric-right"><div class="metric-val">${R(c.liq)}</div><div class="metric-meta">${P(share)} do total</div></div>
+      </div>`;
+    }).join('');
+  }
+
+  // chart
+  if(chartObj){chartObj.destroy();chartObj=null;}
+  if(all.totalBruto>0){
+    const ctx=document.getElementById('chart-canais').getContext('2d');
+    chartObj=new Chart(ctx,{type:'doughnut',data:{labels:canais.map(c=>c.label),datasets:[{data:canais.map(c=>c.bruto),backgroundColor:canais.map(c=>c.color),borderWidth:3,borderColor:'#fff'}]},options:{responsive:true,maintainAspectRatio:false,cutout:'58%',plugins:{legend:{position:'bottom',labels:{font:{size:10},padding:12,usePointStyle:true}},tooltip:{callbacks:{label:ctx=>{const v=ctx.parsed,tot=ctx.dataset.data.reduce((a,b)=>a+b,0);return ` ${Rz(v)} (${P(v/tot*100)})`;} }}}}});
+  }
+
+  // semanas
+  const sDiv=document.getElementById('semanas-rows');
+  const sRows=SEMANAS_DEF.map(s=>{
+    const r=agg(data.semanas,[s.num]);
+    if(!data.semanas[s.num]) return `<div class="metric-row"><div class="metric-name">Semana ${s.num} <span class="badge badge-gray">dias ${s.label}</span></div><div style="color:var(--muted);font-size:12px;">não lançado</div></div>`;
+    return `<div class="metric-row"><div style="flex:1"><div class="metric-name">Semana ${s.num} <span class="badge badge-gray">dias ${s.label}</span></div><div class="metric-detail">${r.totalQtd} pedidos · Taxas: ${Rz(r.totalTaxa)}</div></div><div class="metric-right"><div class="metric-val">${Rz(r.totalLiq)}</div><div class="metric-meta">Bruto: ${Rz(r.totalBruto)}</div></div></div>`;
+  });
+  sDiv.innerHTML=sRows.join('');
+
+  // fechamento
+  const fDiv=document.getElementById('fechamento-rows');
+  if(all.totalBruto===0){ fDiv.innerHTML='<div class="empty">Preencha as semanas para ver o fechamento</div>'; return; }
+  const taxaPct=all.totalBruto>0?all.totalTaxa/all.totalBruto*100:0;
+  const isPartial=filled<4;
+  fDiv.innerHTML=`
+    ${isPartial?`<div style="font-size:11px;color:var(--orange);font-weight:600;margin-bottom:10px;">⚠️ Parcial — ${filled}/4 semanas lançadas</div>`:`<div style="font-size:11px;color:var(--green);font-weight:600;margin-bottom:10px;">✅ Mês completo</div>`}
+    <div class="metric-row"><span style="font-weight:600">Faturamento Bruto</span><span class="metric-val">${Rz(all.totalBruto)}</span></div>
+    <div class="metric-row"><span style="color:var(--red)">− Taxas <span class="badge badge-red">${P(taxaPct)}</span></span><span class="metric-val" style="color:var(--red)">−${Rz(all.totalTaxa)}</span></div>
+    <div class="metric-row" style="padding:12px 0;"><span style="font-size:15px;font-weight:800">Receita Líquida</span><span style="font-size:17px;font-weight:800;color:var(--green)">${Rz(all.totalLiq)}</span></div>
+    <div class="divider"></div>
+    <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">Subtotais por canal</div>
+    ${all.salao.bruto>0?`<div class="metric-row"><div style="flex:1"><div style="font-size:12px;font-weight:600">🪑 CW Salão</div><div class="metric-detail">Bruto: ${Rz(all.salao.bruto)} · Stone: −${Rz(all.salao.taxa)} · ${all.salao.qtd} pedidos · Ticket ${ticket(all.salao.bruto,all.salao.qtd)}</div></div><div class="metric-right"><div class="metric-val">${Rz(all.salao.liq)}</div></div></div>`:''}
+    ${all.delivery.total>0?`<div class="metric-row"><div style="flex:1"><div style="font-size:12px;font-weight:600">🛵 CW Delivery</div><div class="metric-detail">${all.delivery.qtd} pedidos · Ticket ${ticket(all.delivery.total,all.delivery.qtd)} · sem taxa</div></div><div class="metric-right"><div class="metric-val">${Rz(all.delivery.total)}</div></div></div>`:''}
+    ${all.balcao.total>0?`<div class="metric-row"><div style="flex:1"><div style="font-size:12px;font-weight:600">🏪 CW Balcão</div><div class="metric-detail">${all.balcao.qtd} pedidos · Ticket ${ticket(all.balcao.total,all.balcao.qtd)} · sem taxa</div></div><div class="metric-right"><div class="metric-val">${Rz(all.balcao.total)}</div></div></div>`:''}
+    ${all.ifood.bruto>0?`<div class="metric-row"><div style="flex:1"><div style="font-size:12px;font-weight:600">🟩 iFood</div><div class="metric-detail">Bruto: ${Rz(all.ifood.bruto)} · Retido: −${Rz(all.ifood.taxa)} (${P(all.ifood.taxa/all.ifood.bruto*100)}) · ${all.ifood.qtd} pedidos</div></div><div class="metric-right"><div class="metric-val">${Rz(all.ifood.rep)}</div></div></div>`:''}
+    ${all.food99.bruto>0?`<div class="metric-row"><div style="flex:1"><div style="font-size:12px;font-weight:600">🟣 99food</div><div class="metric-detail">Bruto: ${Rz(all.food99.bruto)} · Retido: −${Rz(all.food99.taxa)} (${P(all.food99.taxa/all.food99.bruto*100)}) · ${all.food99.qtd} pedidos</div></div><div class="metric-right"><div class="metric-val">${Rz(all.food99.rep)}</div></div></div>`:''}
+  `;
+}
+
+// ══════════════════════════════════════════
+//  CONFIG
+// ══════════════════════════════════════════
+function renderConfig(){
+  const cfg=getCfg();
+  document.getElementById('cfg-cred').value=cfg.cred;
+  document.getElementById('cfg-deb').value=cfg.deb;
+  document.getElementById('cfg-url').value=getURL();
+  const wrap=document.getElementById('setup-card-wrap');
+  if(!getURL()){
+    wrap.innerHTML=`<div class="setup-card"><h3>⚠️ Nuvem não configurada</h3><p>Configure o Google Apps Script abaixo para sincronizar entre celulares.</p></div>`;
+  } else { wrap.innerHTML=''; }
+}
+
+async function salvarURL(){
+  const url=document.getElementById('cfg-url').value.trim();
+  if(!url){ toast('Cole a URL do Apps Script primeiro'); return; }
+  setURL(url);
+  toast('URL salva — testando conexão...');
+  try {
+    const data=await apiGet(curYear,curMonth);
+    if(data!==null){ toast('✅ Conectado à nuvem com sucesso!'); renderConfig(); syncNow(true); }
+    else { toast('❌ URL inválida — verifique e tente novamente'); }
+  } catch { toast('❌ Erro ao conectar — verifique a URL'); }
+}
+
+async function salvarConfig(){
+  const cfg={cred:parseFloat(document.getElementById('cfg-cred').value)||3.49, deb:parseFloat(document.getElementById('cfg-deb').value)||1.99};
+  setCfgLocal(cfg);
+  try { await apiPost({type:'config', config:cfg}); toast('Taxas salvas na nuvem ✓'); }
+  catch { toast('Taxas salvas localmente ✓'); }
+}
+
+// ══════════════════════════════════════════
+//  EXPORT / CLEAR
+// ══════════════════════════════════════════
+function exportarDados(){
+  const all={};
+  for(let i=0;i<localStorage.length;i++){ const k=localStorage.key(i); if(k.startsWith('pc_dre3')) all[k]=JSON.parse(localStorage.getItem(k)); }
+  const blob=new Blob([JSON.stringify(all,null,2)],{type:'application/json'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+  a.download=`dre-planeta-${curYear}-${String(curMonth+1).padStart(2,'0')}.json`; a.click();
+}
+function limparLocal(){
+  if(!confirm('Limpar cache local? (dados na nuvem são mantidos)')) return;
+  const ks=[];
+  for(let i=0;i<localStorage.length;i++){ const k=localStorage.key(i); if(k.startsWith('pc_dre3_2')) ks.push(k); }
+  ks.forEach(k=>localStorage.removeItem(k));
+  toast('Cache limpo — sincronize para restaurar');
+  renderDash();
+}
+
+// ══════════════════════════════════════════
+//  INIT
+// ══════════════════════════════════════════
+renderDash();
+renderConfig();
+if(!getURL()){ setSyncBar('warn','Configure a nuvem em Config para sincronizar entre celulares'); }
+else { syncNow(true); }
+</script>
+</body>
+</html>
